@@ -56,7 +56,9 @@ module BPMN
     # RULE: Only one flow is taken
     def outgoing_flows(step_execution)
       flows = super
-      return [flows.first]
+      return [] if flows.empty?
+
+      [ flows.first ]
     end
   end
 

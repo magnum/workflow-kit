@@ -128,10 +128,12 @@ module BPMN
     end
 
     def take_all(sequence_flows)
-      sequence_flows.each { |sequence_flow| take(sequence_flow) }
+      sequence_flows.compact.each { |sequence_flow| take(sequence_flow) }
     end
 
     def take(sequence_flow)
+      raise ExecutionError.new("Cannot take a nil sequence flow.") if sequence_flow.nil?
+
       to_step = sequence_flow.target
       tokens_out.push sequence_flow.id
       tokens_out.uniq!
@@ -212,14 +214,22 @@ module BPMN
       evaluate_expression(condition) == true
     end
 
-    def evaluate_expression(expression, variables: parent&.variables || {}.with_indifferent_access)
+    def evaluate_expression(expression, variables: nil)
       return nil if expression.nil?
+
+      variables ||= root_execution.variables.with_indifferent_access
 
       if expression.start_with?("=")
         DMN.evaluate(expression.delete_prefix("="), variables: variables)
       else
         expression
       end
+    end
+
+    def root_execution
+      node = self
+      node = node.parent while node.parent
+      node
     end
 
     def run_automated_tasks
