@@ -73,12 +73,26 @@ module BPMN
       nil
     end
 
-    def element_by_id(id)
+    # When +process_id+ is given, resolve the element inside that process only.
+    # Required when multiple BPMN sources share element ids (common after copy/paste
+    # in Camunda Modeler, or when a call activity callee reuses default ids).
+    def element_by_id(id, process_id: nil)
+      if process_id.present?
+        return process_by_id(process_id)&.element_by_id(id)
+      end
+
       processes.each do |process|
         element = process.element_by_id(id)
         return element if element
       end
       nil
+    end
+
+    # Process that owns +element+ (object identity), or nil.
+    def process_containing(element)
+      return element if element.is_a?(Process)
+
+      processes.find { |process| process.element_by_id(element.id).equal?(element) }
     end
 
     def execution_by_id(id)

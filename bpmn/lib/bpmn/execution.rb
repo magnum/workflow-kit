@@ -26,7 +26,12 @@ module BPMN
     def self.from_json(attributes, context:)
       step_id = attributes.delete("step_id")
       step_type = attributes.delete("step_type")
-      step = step_type == "Process" ? context.process_by_id(step_id) : context.element_by_id(step_id)
+      process_id = attributes.delete("process_id")
+      step = if step_type == "Process"
+        context.process_by_id(step_id)
+      else
+        context.element_by_id(step_id, process_id: process_id)
+      end
       child_attributes = attributes.delete("children")
       Execution.new(attributes.merge(step: step, context: context)).tap do |execution|
         execution.children = child_attributes.map do |ca|
@@ -277,7 +282,12 @@ module BPMN
     end
 
     def waiting_tasks
-      waiting_children.select { |child| child.step.is_a?(BPMN::Task) }
+      children.flat_map do |child|
+        tasks = []
+        tasks << child if child.waiting? && child.step.is_a?(BPMN::Task)
+        tasks.concat(child.waiting_tasks)
+        tasks
+      end
     end
 
     def waiting_automated_tasks
@@ -302,6 +312,7 @@ module BPMN
         id: id,
         step_id: step&.id,
         step_type: step&.class&.name&.demodulize,
+        process_id: owning_process_id,
         attached_to_id: attached_to_id,
         status: status,
         started_at: started_at,
@@ -316,6 +327,13 @@ module BPMN
         condition: condition,
         children: children.map { |child| child.as_json },
       }.transform_values(&:presence).compact
+    end
+
+    def owning_process_id
+      return if step.blank?
+      return step.id if step.is_a?(BPMN::Process)
+
+      context&.process_containing(step)&.id
     end
 
     def inspect
