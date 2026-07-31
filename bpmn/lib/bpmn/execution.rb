@@ -261,7 +261,15 @@ module BPMN
     # Called by the child step executors when they have ended
     #
     def has_ended(_child)
-      step.leave(self) if step.is_a?(BPMN::SubProcess) || step.is_a?(BPMN::CallActivity)
+      # CallActivity / SubProcess: resume the parent flow via +leave+ (which already
+      # ends this execution without notifying the parent). Do NOT call +end(true)+ —
+      # that would end the parent Process and terminate siblings just started by leave
+      # (e.g. the next user task after a call activity returns).
+      if step.is_a?(BPMN::SubProcess) || step.is_a?(BPMN::CallActivity)
+        step.leave(self) unless ended?
+        return
+      end
+
       self.end(true)
     end
 
